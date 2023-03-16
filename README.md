@@ -1,6 +1,6 @@
 Minimap project
 
-<img src="https://github.com/Touutae-lab/Minimap-Javascript/blob/master/Architecture%20%26%20Design.svg" alt="Architecture">
+<img src="https://github.com/Touutae-lab/Minimap-Javascript/blob/master/Achitecture%20Design.svg" alt="Architecture">
 # Contributor
 630510585 [Got](https://github.com/thiradonTH)
 
