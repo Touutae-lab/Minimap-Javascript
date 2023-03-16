@@ -1,0 +1,266 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Simple Multiplayer Game</title>
+  <style>
+    #minimap {
+      position: fixed;
+      top: 10px;
+      left: 10px;
+      border: 1px solid black;
+      background-color: lightgray;
+      display: grid;
+      grid-template-columns: auto auto auto;
+      grid-template-rows: auto auto auto;
+    }
+
+    #minimap>canvas {
+      border: 1px solid black;
+    }
+
+
+    #map {
+      border: solid 1px black;
+      display: block;
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+    }
+  </style>
+  <script src="/socket.io/socket.io.js"></script>
+</head>
+
+<body>
+
+  <div id="minimap">
+    <canvas width="100" height="100">
+    </canvas>
+    <canvas width="100" height="100">
+    </canvas>
+    <canvas width="100" height="100">
+    </canvas>
+    <canvas width="100" height="100">
+    </canvas>
+    <canvas width="100" height="100">
+    </canvas>
+    <canvas width="100" height="100">
+    </canvas>
+    <canvas width="100" height="100">
+    </canvas>
+    <canvas width="100" height="100">
+    </canvas>
+    <canvas width="100" height="100">
+    </canvas>
+  </div>
+  <canvas id="map" width="1280" height="720"></canvas>
+  <script>
+    const areas = {
+      "TOP": {
+        0: 6,
+        1: 7,
+        2: 8,
+        3: 0,
+        4: 1,
+        5: 2,
+        6: 3,
+        7: 4,
+        8: 5,
+      },
+      "DOWN": {
+        0: 3,
+        1: 4,
+        2: 5,
+        3: 6,
+        4: 7,
+        5: 8,
+        6: 0,
+        7: 1,
+        8: 2
+      },
+      "LEFT": {
+        0: 2,
+        1: 0,
+        2: 1,
+        3: 5,
+        4: 3,
+        5: 4,
+        6: 8,
+        7: 6,
+        8: 7
+      },
+      "RIGHT": {
+        0: 1,
+        1: 2,
+        2: 0,
+        3: 4,
+        4: 5,
+        5: 3,
+        6: 7,
+        7: 8,
+        8: 6
+      }
+    };
+
+    const mapSize = {x: 1280, y: 720}
+
+    const socket = io();
+    const minimap = document.getElementById("minimap");
+    const map = document.getElementById("map");
+    const mapCtx = map.getContext("2d")
+
+    let currentPlayers;
+    let thisPlayer;
+
+    socket.on("init", ({ player, players }) => {
+      // players.forEach((p) => addPlayerToMap(p))
+      thisPlayer = player;
+      currentPlayers = players;
+      drawPlayer(players);
+
+      document.addEventListener('keydown', (event) => {
+        const moveAmount = 10;
+        // Calculate the new position of the circle based on the arrow key pressed
+        let newX = player.x;
+        let newY = player.y;
+        let newArea = player.area;
+
+        if (event.key === "ArrowUp") {
+          newY = newY - moveAmount;
+        } else if (event.key === "ArrowDown") {
+          newY = newY + moveAmount;
+        } else if (event.key === "ArrowLeft") {
+          newX = newX - moveAmount;
+        } else if (event.key === "ArrowRight") {
+          newX = newX + moveAmount;
+        }
+
+        // |---|---|---|
+        // |   |   |   |
+        // | 0 | 1 | 2 |
+        // |   |   |   |
+        // |---|---|---|
+        // |   |   |   |
+        // | 3 | 4 | 5 |
+        // |   |   |   |
+        // |---|---|---|
+        // |   |   |   |
+        // | 6 | 7 | 8 |
+        // |   |   |   |
+        // |---|---|---|
+        
+
+        if (newX < 0) {
+          newArea = areas.LEFT[player.area]
+          newX = mapSize.x;
+        }
+
+        if (newX > mapSize.x){
+          newArea = areas.RIGHT[player.area]
+          newX = 0;
+        }
+
+        if (newY < 0) {
+          newArea = areas.TOP[player.area]
+          newY = mapSize.y;
+        }
+
+        if (newY > mapSize.y){
+          newArea = areas.DOWN[player.area]
+          newY = 0;
+        }
+
+        newX %= 1281;
+        newY %= 721;
+
+        let collides = false;
+        for (const otherPlayerId in currentPlayers) {
+          if (currentPlayers.hasOwnProperty(otherPlayerId) && otherPlayerId != player.id && currentPlayers[otherPlayerId].area == newArea) {
+            if (collision(newX, newY, currentPlayers[otherPlayerId])) {
+              collides = true
+              break
+            }
+          }
+        }
+        if (!collides) {
+          player.x = newX;
+          player.y = newY;
+          player.area = newArea;
+          socket.emit("movementEvent", player)
+        }
+      })
+
+
+    });
+
+    socket.on("updateMovement", (players) => {
+      currentPlayers = players;
+      redraw(players)
+    })
+
+    socket.on("newPlayer", (player) => {
+      addPlayerToMinimap(player)
+      addPlayerToMap(player)
+    });
+
+    socket.on("playerDisconnected", (players) => {
+      currentPlayers = players;
+      redraw(players)
+    });
+
+    function addPlayerToMinimap(player) {
+      const minimapCtx = minimap.children[player.area].getContext("2d")
+      const minimapRatioX = 12.8;
+      const minimapRatioY = 7.2;
+      const x = player.x / minimapRatioX;
+      const y = player.y / minimapRatioY;
+      const size = 10
+      drawCircle(minimapCtx, x, y, player.color, size)
+    }
+
+    function addPlayerToMap(player) {
+      if (thisPlayer.area !== player.area) return
+      drawCircle(mapCtx, player.x, player.y, player.color)
+    }
+
+    function redraw(players) {
+      clearCanvas();
+      drawPlayer(players);
+    }
+
+    function drawPlayer(players) {
+      Object.entries(players).forEach(([_, currPlayer]) => { addPlayerToMinimap(currPlayer); addPlayerToMap(currPlayer); });
+    }
+
+    function clearCanvas() {
+      for (i = 0; i < 9; i++){
+        const currentMinimap = minimap.children[i].getContext("2d") 
+        currentMinimap.clearRect(0, 0, 100, 100);
+      }
+      mapCtx.clearRect(0, 0, mapSize.x, mapSize.y);
+    }
+
+
+    function drawCircle(ctx, x, y, color, size = 50) {
+      ctx.beginPath();
+      ctx.arc(x, y, size, 0, 2 * Math.PI);
+      ctx.fillStyle = color;
+      ctx.fill();
+      ctx.closePath();
+    }
+
+    function collision(newX, newY, otherPlayer) {
+      const size = 100;
+      const dist = Math.sqrt(((newX - otherPlayer.x) * (newX - otherPlayer.x)) + ((newY - otherPlayer.y) * (newY - otherPlayer.y)))
+
+      return dist < size;
+    }
+
+
+  </script>
+</body>
+
+</html>
