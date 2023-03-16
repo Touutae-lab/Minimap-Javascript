@@ -30,6 +30,16 @@
       left: 50%;
       transform: translate(-50%, -50%);
     }
+
+    #info {
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      position: absolute;
+      top: 10px;
+      right: 10px;
+    }
   </style>
   <script src="/socket.io/socket.io.js"></script>
 </head>
@@ -55,6 +65,10 @@
     </canvas>
     <canvas width="100" height="100">
     </canvas>
+  </div>
+  <div id="info">
+  <p>Your Character</p>
+    <canvas id="your-color" width="50" height="50"></canvas>
   </div>
   <canvas id="map" width="1280" height="720"></canvas>
   <script>
@@ -110,7 +124,9 @@
     const socket = io();
     const minimap = document.getElementById("minimap");
     const map = document.getElementById("map");
-    const mapCtx = map.getContext("2d")
+    const mapCtx = map.getContext("2d");
+    const playerColor = document.getElementById("your-color");
+    const playerColorCtx = playerColor.getContext("2d")
 
     let currentPlayers;
     let thisPlayer;
@@ -120,9 +136,13 @@
       thisPlayer = player;
       currentPlayers = players;
       drawPlayer(players);
+      playerColorCtx.beginPath()
+      playerColorCtx.fillStyle = player.color;
+      playerColorCtx.fillRect(0, 0, 50, 50);
+
 
       document.addEventListener('keydown', (event) => {
-        const moveAmount = 10;
+        const moveAmount = 20;
         // Calculate the new position of the circle based on the arrow key pressed
         let newX = player.x;
         let newY = player.y;
@@ -217,7 +237,7 @@
       const minimapRatioY = 7.2;
       const x = player.x / minimapRatioX;
       const y = player.y / minimapRatioY;
-      const size = 10
+      const size = 5
       drawCircle(minimapCtx, x, y, player.color, size)
     }
 
